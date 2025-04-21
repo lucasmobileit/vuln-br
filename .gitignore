@@ -1,0 +1,40 @@
+# Arquivos de configuração sensíveis
+.env
+
+# Arquivos temporários do Nmap
+*.xml
+
+# Arquivos de saída do VulScan
+resultados_*.json
+resultados_*.csv
+resultados_*.html
+
+# Arquivos gerados pelo Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+
+# Ambientes virtuais
+venv/
+env/
+.venv/
+
+# Arquivos de IDE e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# Arquivos de log
+*.log
+
+# Outros arquivos temporários
+*.bak
+*.tmp
+*.cache

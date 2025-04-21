@@ -126,10 +126,6 @@ Os logs são exibidos no console, incluindo uma tabela com os serviços detectad
 4. Push para a branch (`git push origin feature/nova-funcionalidade`).
 5. Abra um Pull Request.
 
-## Licença
-
-Este projeto está licenciado sob a Licença MIT. Veja o arquivo `LICENSE` para detalhes (adicione um se necessário).
-
 ## Suporte
 
 Se encontrar problemas ou tiver sugestões, abra uma issue no repositório ou entre em contato com o mantenedor.
