@@ -1,0 +1,11 @@
+services:
+  iot_ot_ports:
+    - "21"
+    - "22"
+    - "23"
+    - "80"
+    - "443"
+    - "502"
+  default_args: "-sV -oX -"
+  nse_scripts:
+    - nping-echo
