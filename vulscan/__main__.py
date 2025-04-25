@@ -1,3 +1,4 @@
+
 """
 Módulo principal do VulScan, unifica todas as funcionalidades.
 """
@@ -5,18 +6,11 @@ Módulo principal do VulScan, unifica todas as funcionalidades.
 import os
 import sys
 import re
-import argparse
 from dotenv import load_dotenv
-from tabulate import tabulate
-import logging
 
-from nvd_api import NvdApi
-from nmap_scanner import NmapScanner
-from exporter import ResultExporter
-
-# Configuração do logger
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-logger = logging.getLogger(__name__)
+from vulscan.nvd_api import NvdApi
+from vulscan.nmap_scanner import NmapScanner
+from vulscan.exporter import ResultExporter
 
 def validate_target(input_target: str) -> bool:
     """
@@ -28,9 +22,13 @@ def validate_target(input_target: str) -> bool:
     Returns:
         True se o alvo for válido, False caso contrário
     """
+    # Validar IP simples (simplificado)
     ip_pattern = r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$"
+    # Validar CIDR
     cidr_pattern = r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$"
+    # Validar range de IPs
     range_pattern = r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}-\d{1,3}$"
+    # Validar hostname
     hostname_pattern = r"^[a-zA-Z0-9][-a-zA-Z0-9.]{0,253}[a-zA-Z0-9]$"
     
     return (re.match(ip_pattern, input_target) is not None or
@@ -38,98 +36,98 @@ def validate_target(input_target: str) -> bool:
             re.match(range_pattern, input_target) is not None or
             re.match(hostname_pattern, input_target) is not None)
 
-def parse_args():
-    """Parseia argumentos de linha de comando."""
-    parser = argparse.ArgumentParser(description="VulScan - Scanner de Serviços + Consulta de CVEs")
-    parser.add_argument("target", help="IP, hostname, CIDR ou range (ex: 192.168.1.1, 192.168.1.0/24)")
-    parser.add_argument("--iot", action="store_true", help="Escaneamento para dispositivos IoT/OT")
-    parser.add_argument("--output-dir", default=".", help="Diretório para salvar os resultados")
-    parser.add_argument("--verbose", action="store_true", help="Ativa modo verboso (logging DEBUG)")
-    return parser.parse_args()
-
 def main():
     """Função principal do programa."""
-    args = parse_args()
+    print("🛡️  VulScan - Scanner de Serviços + Consulta de CVEs")
+    print("---------------------------------------------------")
     
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-    
-    logger.info("🛡️  VulScan - Scanner de Serviços + Consulta de CVEs")
-    logger.info("---------------------------------------------------")
-    logger.info(f"Arquivos serão salvos em: {os.path.abspath(args.output_dir)}")
-    
+    # Carrega variáveis de ambiente
     load_dotenv()
     api_key = os.getenv("NVD_API_KEY")
     
     if not api_key:
-        logger.error("API Key da NVD não encontrada! Defina em um arquivo .env como NVD_API_KEY.")
+        print("[!] API Key da NVD não encontrada! Defina em um arquivo .env como NVD_API_KEY.")
         sys.exit(1)
     
-    target = args.target.strip()
+    # Obtém o alvo do scan
+    print("\nOpções de alvos:")
+    print("  - IP único (ex: 192.168.1.1)")
+    print("  - Hostname (ex: example.com)")
+    print("  - Rede CIDR (ex: 192.168.1.0/24)")
+    print("  - Range de IPs (ex: 192.168.1.1-10)")
+    
+    target = input("\nDigite o IP, hostname ou rede a ser analisado: ").strip()
     if not target or not validate_target(target):
-        logger.error("Alvo inválido. Forneça um IP, hostname, notação CIDR ou range válido.")
-        sys.exit(1)
+        print("[!] Alvo inválido. Por favor, forneça um IP, hostname, notação CIDR ou range válido.")
+        return
     
-    is_iot_scan = args.iot
+    # Adiciona opção para escolher o tipo de dispositivo a ser escaneado
+    print("\nTipo de dispositivos a serem escaneados:")
+    print("  1. Padrão (servidores, PCs, dispositivos de rede)")
+    print("  2. IoT/OT (dispositivos industriais, sensores, PLCs)")
+    
+    scan_type = input("\nEscolha uma opção (1/2) [1]: ").strip() or "1"
+    is_iot_scan = scan_type == "2"
+    
     if is_iot_scan:
-        logger.info("Modo de escaneamento IoT/OT selecionado.")
-        logger.info("Este modo detecta dispositivos industriais, protocolos comuns e sensores IoT.")
-        logger.info("Atenção: O escaneamento será mais lento para evitar impactos em dispositivos sensíveis.")
+        print("\n[*] Modo de escaneamento IoT/OT selecionado.")
+        print("[*] Este modo detecta dispositivos industriais, protocolos comuns e sensores IoT.")
+        print("[*] Atenção: O escaneamento será mais lento para evitar impactos em dispositivos sensíveis.")
         
     try:
+        # Inicializa as classes
         nvd_api = NvdApi(api_key)
         scanner = NmapScanner(nvd_api)
         exporter = ResultExporter()
         
-        logger.info(f"Iniciando análise de {target}...")
+        # Executa o scan
+        print(f"\n[~] Iniciando análise de {target}...")
         xml_file = scanner.scan(target, is_iot_scan)
         
-        logger.debug("Analisando resultados do scan...")
+        # Analisa os resultados
         results = scanner.parse_results(xml_file)
         
         if not results:
-            logger.warning("Nenhum serviço vulnerável encontrado ou scan sem resultados.")
+            print("\n[!] Nenhum serviço vulnerável encontrado ou scan sem resultados.")
             return
         
-        logger.debug(f"Resultados do scan: {results}")
+        # Identifica se é uma rede ou um host único
         is_network = scanner.is_valid_network(target)
             
-        logger.info(f"\n🔍 Resultados para {target}:\n")
+        # Exibe os resultados
+        print(f"\n🔍 Resultados para {target}:\n")
         
+        # Agrupa resultados por host se for uma rede
         if is_network:
             hosts = set(item['host'] for item in results)
             for host in hosts:
-                logger.info(f"\n[Host: {host}]")
+                print(f"\n[Host: {host}]")
                 host_results = [item for item in results if item['host'] == host]
-                table = [
-                    [item['port'], item['service'], item['version'] or 'desconhecida', item['cve_id'], item['cve_desc']]
-                    for item in host_results
-                ]
-                logger.info(tabulate(table, headers=['Porta', 'Serviço', 'Versão', 'CVE', 'Descrição'], tablefmt='grid'))
+                for item in host_results:
+                    print(f"[Porta {item['port']}] {item['service']} ({item['version'] or 'versão desconhecida'})")
+                    print(f"  CVE: {item['cve_id']}")
+                    print(f"  Desc: {item['cve_desc']}\n")
         else:
-            table = [
-                [item['port'], item['service'], item['version'] or 'desconhecida', item['cve_id'], item['cve_desc']]
-                for item in results
-            ]
-            logger.info(tabulate(table, headers=['Porta', 'Serviço', 'Versão', 'CVE', 'Descrição'], tablefmt='grid'))
+            for item in results:
+                print(f"[Porta {item['port']}] {item['service']} ({item['version'] or 'versão desconhecida'})")
+                print(f"  CVE: {item['cve_id']}")
+                print(f"  Desc: {item['cve_desc']}\n")
             
-        json_file = exporter.export_json(results, target, args.output_dir)
-        csv_file = exporter.export_csv(results, target, args.output_dir)
-        html_file = exporter.export_html(results, target, args.output_dir)
+        # Exporta os resultados
+        json_file = exporter.export_json(results, target)
+        csv_file = exporter.export_csv(results, target)
+        html_file = exporter.export_html(results, target)
         
-        logger.info("\n[✔] Resultados exportados para:")
-        if json_file:
-            logger.info(f"  - {json_file} (JSON)")
-        if csv_file:
-            logger.info(f"  - {csv_file} (CSV)")
-        if html_file:
-            logger.info(f"  - {html_file} (HTML)")
+        print(f"\n[✔] Resultados exportados para:")
+        print(f"  - {json_file} (JSON)")
+        print(f"  - {csv_file} (CSV)")
+        print(f"  - {html_file} (HTML)")
         
     except KeyboardInterrupt:
-        logger.warning("\nOperação cancelada pelo usuário.")
+        print("\n\n[!] Operação cancelada pelo usuário.")
         sys.exit(0)
     except Exception as e:
-        logger.error(f"Erro inesperado: {e}", exc_info=True)
+        print(f"\n[!] Erro inesperado: {e}")
         sys.exit(1)
 
 if __name__ == '__main__':

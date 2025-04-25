@@ -1,3 +1,4 @@
+
 """
 Módulo para exportar os resultados do VulScan.
 """
@@ -6,104 +7,77 @@ import json
 import csv
 import os
 from typing import List, Dict
-import logging
-
-# Configuração do logger
-logger = logging.getLogger(__name__)
 
 class ResultExporter:
     """Classe para exportar resultados do scan para diferentes formatos."""
     
     @staticmethod
-    def export_json(data: List[Dict], target: str, output_dir: str = ".") -> str:
+    def export_json(data: List[Dict], target: str) -> str:
         """
         Exporta os resultados para um arquivo JSON.
         
         Args:
             data: Lista de dicionários com os resultados do scan
             target: O alvo do scan (IP, hostname ou rede)
-            output_dir: Diretório para salvar o arquivo
             
         Returns:
-            Caminho do arquivo JSON gerado ou vazio em caso de erro
+            Caminho do arquivo JSON gerado
         """
-        if not data:
-            logger.warning("Nenhum dado para exportar para JSON.")
-            return ""
-            
+        # Remove caracteres inválidos para nome de arquivo
         safe_target = target.replace('.', '_').replace('/', '_').replace('-', '_')
-        filename = os.path.join(output_dir, f"resultados_{safe_target}.json")
-        os.makedirs(output_dir, exist_ok=True)
+        filename = f"resultados_{safe_target}.json"
         
-        try:
-            with open(filename, 'w', encoding='utf-8') as file:
-                json.dump(data, file, indent=2, ensure_ascii=False)
-            logger.info(f"JSON gerado: {filename}")
-            return filename
-        except Exception as e:
-            logger.error(f"Erro ao exportar JSON: {e}")
-            return ""
+        with open(filename, 'w', encoding='utf-8') as file:
+            json.dump(data, file, indent=2, ensure_ascii=False)
+            
+        return filename
     
     @staticmethod
-    def export_csv(data: List[Dict], target: str, output_dir: str = ".") -> str:
+    def export_csv(data: List[Dict], target: str) -> str:
         """
         Exporta os resultados para um arquivo CSV.
         
         Args:
             data: Lista de dicionários com os resultados do scan
             target: O alvo do scan (IP, hostname ou rede)
-            output_dir: Diretório para salvar o arquivo
             
         Returns:
-            Caminho do arquivo CSV gerado ou vazio em caso de erro
+            Caminho do arquivo CSV gerado
         """
-        if not data:
-            logger.warning("Nenhum dado para exportar para CSV.")
-            return ""
-            
+        # Remove caracteres inválidos para nome de arquivo
         safe_target = target.replace('.', '_').replace('/', '_').replace('-', '_')
-        filename = os.path.join(output_dir, f"resultados_{safe_target}.csv")
-        os.makedirs(output_dir, exist_ok=True)
+        filename = f"resultados_{safe_target}.csv"
         
-        fieldnames = ['host', 'port', 'service', 'version', 'cve_id', 'cve_desc'] if data and 'host' in data[0] else ['port', 'service', 'version', 'cve_id', 'cve_desc']
+        # Define os campos do CSV
+        if data and 'host' in data[0]:
+            fieldnames = ['host', 'port', 'service', 'version', 'cve_id', 'cve_desc']
+        else:
+            fieldnames = ['port', 'service', 'version', 'cve_id', 'cve_desc']
         
-        try:
-            with open(filename, 'w', newline='', encoding='utf-8') as file:
-                writer = csv.DictWriter(file, fieldnames=fieldnames)
-                writer.writeheader()
-                # Normaliza 'version' para evitar None
-                normalized_data = [
-                    {**item, 'version': item.get('version') or 'Desconhecida'}
-                    for item in data
-                ]
-                writer.writerows(normalized_data)
-            logger.info(f"CSV gerado: {filename}")
-            return filename
-        except Exception as e:
-            logger.error(f"Erro ao exportar CSV: {e}")
-            return ""
+        with open(filename, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+            
+        return filename
     
     @staticmethod
-    def export_html(data: List[Dict], target: str, output_dir: str = ".") -> str:
+    def export_html(data: List[Dict], target: str) -> str:
         """
         Exporta os resultados para um arquivo HTML.
         
         Args:
             data: Lista de dicionários com os resultados do scan
             target: O alvo do scan (IP, hostname ou rede)
-            output_dir: Diretório para salvar o arquivo
             
         Returns:
-            Caminho do arquivo HTML gerado ou vazio em caso de erro
+            Caminho do arquivo HTML gerado
         """
-        if not data:
-            logger.warning("Nenhum dado para exportar para HTML.")
-            return ""
-            
+        # Remove caracteres inválidos para nome de arquivo
         safe_target = target.replace('.', '_').replace('/', '_').replace('-', '_')
-        filename = os.path.join(output_dir, f"resultados_{safe_target}.html")
-        os.makedirs(output_dir, exist_ok=True)
+        filename = f"resultados_{safe_target}.html"
         
+        # Cria o conteúdo HTML
         html_content = """
         <!DOCTYPE html>
         <html lang="pt-BR">
@@ -145,11 +119,13 @@ class ResultExporter:
         </html>
         """
         
+        # Substitui os placeholders
         from datetime import datetime
         
         html_content = html_content.replace("TARGET_PLACEHOLDER", target)
         html_content = html_content.replace("DATA_PLACEHOLDER", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         
+        # Cria os cabeçalhos
         if data and 'host' in data[0]:
             headers = "<th>Host</th><th>Porta</th><th>Serviço</th><th>Versão</th><th>CVE</th><th>Descrição</th>"
         else:
@@ -157,14 +133,17 @@ class ResultExporter:
             
         html_content = html_content.replace("HEADERS_PLACEHOLDER", headers)
         
+        # Cria as linhas
         rows = ""
         for item in data:
             row = "<tr>"
+            
             if 'host' in item:
                 row += f"<td>{item['host']}</td>"
+                
             row += f"<td>{item['port']}</td>"
             row += f"<td>{item['service']}</td>"
-            row += f"<td>{item.get('version', 'Desconhecida')}</td>"
+            row += f"<td>{item['version'] or 'Desconhecida'}</td>"
             row += f"<td>{item['cve_id']}</td>"
             row += f"<td>{item['cve_desc']}</td>"
             row += "</tr>"
@@ -172,11 +151,8 @@ class ResultExporter:
             
         html_content = html_content.replace("ROWS_PLACEHOLDER", rows)
         
-        try:
-            with open(filename, 'w', encoding='utf-8') as file:
-                file.write(html_content)
-            logger.info(f"HTML gerado: {filename}")
-            return filename
-        except Exception as e:
-            logger.error(f"Erro ao exportar HTML: {e}")
-            return ""
+        # Escreve o arquivo HTML
+        with open(filename, 'w', encoding='utf-8') as file:
+            file.write(html_content)
+            
+        return filename
