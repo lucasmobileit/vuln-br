@@ -1,99 +1,64 @@
-"""
-Módulo para interagir com a API da NVD (National Vulnerability Database).
-"""
-
 import time
 import requests
-from typing import Dict, Optional
+import logging
+from typing import List, Dict, Optional, Any
+
+logger = logging.getLogger(__name__)
 
 class NvdApi:
-    """Classe para interagir com a API da NVD."""
-    
-    BASE_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
-    
-    def __init__(self, api_key: str):
+    BASE_URL = 'https://services.nvd.nist.gov/rest/json/cves/2.0'
+
+    def __init__(self, api_key: str, rate_limit_delay: float = 0.6):
         self.api_key = api_key
-        self.last_request_time = 0
-        self.rate_limit_delay = 0.6  # 600ms entre requisições para respeitar o rate limit
-    
-    def _rate_limit(self) -> None:
-        """Implementa rate limiting para evitar bloqueio da API."""
-        elapsed = time.time() - self.last_request_time
-        if elapsed < self.rate_limit_delay:
-            time.sleep(self.rate_limit_delay - elapsed)
-        self.last_request_time = time.time()
-    
-    def search(self, query: str) -> Optional[Dict[str, str]]:
-        """
-        Busca CVEs relacionadas a um serviço/versão.
-        
-        Args:
-            query: Texto para busca de CVEs
-            
-        Returns:
-            Dicionário com id e descrição da CVE ou None se não encontrar
-        """
-        self._rate_limit()
-        url = f"{self.BASE_URL}?keywordSearch={query}"
+        self.last = 0.0
+        self.delay = rate_limit_delay
+
+    def _delay(self) -> None:
+        elapsed = time.time() - self.last
+        if elapsed < self.delay:
+            time.sleep(self.delay - elapsed)
+        self.last = time.time()
+
+    def search(self, query: str) -> Optional[List[Dict[str, Any]]]:
+        self._delay()
         headers = {'apiKey': self.api_key}
-        
+        params = {'keywordSearch': query}
         try:
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            if data.get('totalResults', 0) > 0:
-                cve = data['vulnerabilities'][0]['cve']
-                description = cve['descriptions'][0]['value']
-                
-                return {
-                    'id': cve['id'],
-                    'description': description
-                }
-        except requests.exceptions.RequestException as e:
-            print(f"[!] Erro na requisição à API da NVD: {e}")
-        except (KeyError, IndexError) as e:
-            print(f"[!] Erro ao processar resposta da API: {e}")
+            resp = requests.get(self.BASE_URL, params=params, headers=headers, timeout=10)
+            if resp.status_code == 429:
+                retry = int(resp.headers.get('Retry-After', 1))
+                logger.warning(f"Rate limit atingido, aguardando {retry}s")
+                time.sleep(retry)
+                return self.search(query)
+            resp.raise_for_status()
+            data = resp.json()
+            vulns = data.get('vulnerabilities', [])
+            result: List[Dict[str, Any]] = []
+            for item in vulns:
+                c = item['cve']
+                desc = next((d['value'] for d in c.get('descriptions', []) if d.get('lang') == 'en'), '')
+                metrics_v3 = c.get('metrics', {}).get('cvssMetricV3', [])
+                metrics_v2 = c.get('metrics', {}).get('cvssMetricV2', [])
+                score = None
+                if metrics_v3:
+                    score = metrics_v3[0].get('cvssData', {}).get('baseScore')
+                elif metrics_v2:
+                    score = metrics_v2[0].get('cvssData', {}).get('baseScore')
+                result.append({'id': c['id'], 'description': desc, 'score': score})
+            return result or None
         except Exception as e:
-            print(f"[!] Erro inesperado ao consultar CVE: {e}")
-            
-        return None
+            logger.error(f"Erro ao consultar NVD: {e}")
+            return None
 
-    def get_cve_info(self, service: str, version: str) -> Dict[str, str]:
-        """
-        Obtém informações de CVE para um serviço e versão.
-        Tenta com serviço+versão primeiro, depois só com serviço.
-        
-        Args:
-            service: Nome do serviço
-            version: Versão do serviço
-            
-        Returns:
-            Dicionário com informações da CVE ou mensagem de não encontrado
-        """
+    def get_cve_info(self, service: str, version: Optional[str] = None) -> Dict[str, Any]:
         if not service:
-            return {
-                'id': 'N/A',
-                'description': 'Serviço não identificado.',
-                'confidence': 'Baixa'
-            }
-
-        # Busca com serviço + versão
+            return {'cve_details': [], 'confidence': 'Baixa', 'description': 'Serviço não identificado.'}
+        query = f"{service} {version}" if version else service
+        res = self.search(query)
+        if res:
+            return {'cve_details': res, 'confidence': 'Alta', 'description': f"{len(res)} CVEs encontrados."}
         if version:
-            result = self.search(f"{service} {version}")
-            if result:
-                result['confidence'] = 'Alta'
-                return result
-
-        # Busca apenas pelo serviço
-        result = self.search(service)
-        if result:
-            result['confidence'] = 'Média'
-            return result
-
-        # Nada encontrado
-        return {
-            'id': 'Nenhum CVE encontrado',
-            'description': 'Versão do serviço não identificada ou nenhum CVE correspondente encontrado na NVD.',
-            'confidence': 'Baixa'
-        }
+            res2 = self.search(service)
+            if res2:
+                return {'cve_details': res2, 'confidence': 'Média', 'description': f"{len(res2)} CVEs (sem versão)."}
+        return {'cve_details': [], 'confidence': 'Baixa', 'description': 'Nenhum CVE correspondente encontrado.'}
