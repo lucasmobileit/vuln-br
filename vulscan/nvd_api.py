@@ -1,4 +1,3 @@
-
 """
 Módulo para interagir com a API da NVD (National Vulnerability Database).
 """
@@ -52,11 +51,11 @@ class NvdApi:
                     'description': description
                 }
         except requests.exceptions.RequestException as e:
-            print(f"  [!] Erro na requisição à API da NVD: {e}")
+            print(f"[!] Erro na requisição à API da NVD: {e}")
         except (KeyError, IndexError) as e:
-            print(f"  [!] Erro ao processar resposta da API: {e}")
+            print(f"[!] Erro ao processar resposta da API: {e}")
         except Exception as e:
-            print(f"  [!] Erro inesperado ao consultar CVE: {e}")
+            print(f"[!] Erro inesperado ao consultar CVE: {e}")
             
         return None
 
@@ -72,20 +71,29 @@ class NvdApi:
         Returns:
             Dicionário com informações da CVE ou mensagem de não encontrado
         """
-        # Primeiro tenta buscar com serviço e versão juntos
+        if not service:
+            return {
+                'id': 'N/A',
+                'description': 'Serviço não identificado.',
+                'confidence': 'Baixa'
+            }
+
+        # Busca com serviço + versão
         if version:
             result = self.search(f"{service} {version}")
             if result:
+                result['confidence'] = 'Alta'
                 return result
-                
-        # Se não encontrou ou não tem versão, tenta só com o serviço
-        if service:
-            result = self.search(service)
-            if result:
-                return result
-                
-        # Se nada foi encontrado, retorna mensagem padrão
+
+        # Busca apenas pelo serviço
+        result = self.search(service)
+        if result:
+            result['confidence'] = 'Média'
+            return result
+
+        # Nada encontrado
         return {
             'id': 'Nenhum CVE encontrado',
-            'description': 'Sem vulnerabilidades conhecidas ou não encontradas na API.'
+            'description': 'Versão do serviço não identificada ou nenhum CVE correspondente encontrado na NVD.',
+            'confidence': 'Baixa'
         }
