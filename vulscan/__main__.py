@@ -23,7 +23,7 @@ def summarize_by_service(results: Any, threshold: float) -> Dict[str, Dict[str, 
 
 
 def main():
-    parser = argparse.ArgumentParser(description='VulScan: Scanner de vulnerabilidades')
+    parser = argparse.ArgumentParser(description='Vuln-BR: Scanner de vulnerabilidades')
     parser.add_argument('target', help='IP, range ou CIDR')
     parser.add_argument('--api-key', required=True, help='Chave da NVD API')
     parser.add_argument('--output', choices=['json','csv','html'], default='json')
