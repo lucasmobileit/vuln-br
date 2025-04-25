@@ -6,11 +6,11 @@ Módulo principal do VulScan, unifica todas as funcionalidades.
 import os
 import sys
 import re
-from dotenv import load_dotenv
+from dotenv import load_dotenv # type: ignore
 
-from vulscan.nvd_api import NvdApi
-from vulscan.nmap_scanner import NmapScanner
-from vulscan.exporter import ResultExporter
+from nvd_api import NvdApi
+from nmap_scanner import NmapScanner
+from exporter import ResultExporter
 
 def validate_target(input_target: str) -> bool:
     """
