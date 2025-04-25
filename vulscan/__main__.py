@@ -50,14 +50,26 @@ def main():
     for svc, data in summary.items():
         logging.info("  Serviço %s: %d CVEs ( %d alto, %d médio )", svc, data['total'], data['high'], data['medium'])
 
-    summary_list = [
-        {'service': svc, 'total': vals['total'], 'high': vals['high'], 'medium': vals['medium']}
-        for svc, vals in summary.items()
-    ]
+    # agora incluímos a lista de detalhes no resumo
+    summary_list = []
+    for svc, vals in summary.items():
+        detalhes = []
+        for item in enriched:
+            if item['service'] == svc:
+                for c in (item['cve_details'] or []):
+                    if c.get('score') is not None and c['score'] >= args.threshold:
+                        detalhes.append(c['id'])
+        summary_list.append({
+            'service': svc,
+            'total': vals['total'],
+            'high': vals['high'],
+            'medium': vals['medium'],
+            'details': detalhes
+        })
 
     exporter = ResultExporter()
     file = getattr(exporter, f'export_{args.output}')(summary_list, args.target + '_summary')
-    logging.info(f"Arquivo de resumo gerado: {file}")
+    logging.info(f"Arquivo gerado: {file}")
 
 if __name__ == '__main__':
     main()
