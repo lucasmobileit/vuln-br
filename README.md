@@ -1,4 +1,4 @@
-# VulScan_IP
+# Vuln-BR
 
 Scanner de vulnerabilidades que integra Nmap + NVD API, exportando resumos executivos e detalhes técnicos.
 
@@ -13,7 +13,7 @@ Scanner de vulnerabilidades que integra Nmap + NVD API, exportando resumos execu
 - Python 3.8+
 - Dependências:
   ```bash
-  pip install -r requirements.txt
+  pip install -r requirements.txt 
   ```
   - requests
   - pyyaml
