@@ -23,7 +23,7 @@ Edite o arquivo **config.yaml** para ajustar portas e scripts NSE antes de rodar
 
 ## Instalação
 ```bash
-git clone https://github.com/lucasmobileit/vulscan_ip.git
+git clone https://github.com/lucasmobileit/vuln-br.git
 pip install -r requirements.txt
 ```
 
